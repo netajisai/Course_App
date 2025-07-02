@@ -1,0 +1,22 @@
+# Node modules (very large, auto-generated)
+node_modules/
+
+# Environment variables (never push secrets)
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS/system files
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+
+# Output folders
+dist/
+build/
