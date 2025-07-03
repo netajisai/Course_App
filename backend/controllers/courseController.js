@@ -1,18 +1,10 @@
 import mongoose from 'mongoose'
-import jwt from 'jsonwebtoken'
-import { z } from 'zod'
 import { CourseModel, PurchaseModel } from '../models/db.js'
-
-const zod_schema = z.object({
-    title: z.string().min(3, "Title must be at least 3 characters"),
-    description: z.string().min(10, "Description must be at least 10 characters"),
-    price: z.number().positive("Price must be a positive number"),
-    imageLink: z.string()
-})
+import { course_schema, partial_course_schema } from '../schemas/schema.js'
 
 
 export async function createCourse(req, res, next){ 
-    const parsed = zod_schema.safeParse(req.body)
+    const parsed = course_schema.safeParse(req.body)
     if(!parsed.success){
         return res.status(400).json({
             message: "Invalid Course data",
@@ -55,7 +47,7 @@ export async function createCourse(req, res, next){
 
 export async function updateCourse(req, res, next){
     console.log(req.body)
-    const parsed = zod_schema.safeParse(req.body)
+    const parsed = partial_course_schema.safeParse(req.body)
     if(!parsed.success){
         return res.status(400).json({
             message: "Invalid Course data",
@@ -93,22 +85,8 @@ export async function updateCourse(req, res, next){
             message:`Error Updating Course:${err}`
         })
     }
-
-    // const course = await CourseModel.findOne({ _id: courseId });
-    // if (!course) {
-    // return res.status(404).json({ message: "Course not found" });
-    // }
-    // if (course.createdBy.toString() !== adminId) {
-    // return res.status(403).json({ message: "Unauthorized" });
-    // }
-    // // Update only the fields that are provided
-    // if (title !== undefined) course.title = title;
-    // if (description !== undefined) course.description = description;
-    // if (price !== undefined) course.price = price;
-    // if (imageLink !== undefined) course.imageLink = imageLink;
-    // await course.save();
-    
 }
+
 
 export async function deleteCourse(req, res, next){
     const adminId = req.tokenId
@@ -141,12 +119,11 @@ export async function deleteCourse(req, res, next){
     }
 }
 
+
 export async function getCourse(req, res, next){
     const adminId = req.tokenId
     try{
-        const courses = await CourseModel.find({
-            createdBy: adminId
-        })
+        const courses = await CourseModel.find({createdBy: adminId}).lean()
         console.log(courses)
         if(courses.length === 0){
             return res.status(404).json({
@@ -164,6 +141,7 @@ export async function getCourse(req, res, next){
     }
 }
 
+
 export async function getSpecificCourse(req, res, next){
     const adminId = req.tokenId
     const courseId = req.params.courseId
@@ -177,7 +155,7 @@ export async function getSpecificCourse(req, res, next){
         const course = await CourseModel.findOne({
             _id: courseId,
             createdBy: adminId
-        })
+        }).lean()
         if(!course){
             return res.status(404).json({
                 message: `Course ${courseId} not found or not owned by you`
@@ -194,9 +172,10 @@ export async function getSpecificCourse(req, res, next){
     }
 }
 
+
 export async function getCourses(req, res, next){
     try{
-        const courses = await CourseModel.find({})
+        const courses = await CourseModel.find({}).lean()
         if(courses.length === 0){
             return res.status.json({
                 message:`No courses found`
@@ -212,6 +191,7 @@ export async function getCourses(req, res, next){
         })
     }
 }
+
 
 export async function purchaseCourse(req, res, next){
     const userId = req.tokenId
@@ -258,6 +238,7 @@ export async function purchaseCourse(req, res, next){
     }
 }
 
+
 export async function userPurchases(req, res, next){
     const userId = req.tokenId
     try{
@@ -267,16 +248,27 @@ export async function userPurchases(req, res, next){
                 message: `User ${userId} not purchased any courses`
             })
         }
+
         // Mapping result documents to find course details bought by user
         const courseData = await CourseModel.find({
             _id: {$in: result.map(x => x.courseId)}
         }).lean()
-        res.json({
-            courses: courseData.map(course => ({
-                course,
-                purchasedAt: result.find(p=>p.courseId.toString() === course._id.toString())?.purchasedAt
-            }))
+
+        // find() inside map() will take O(n*m)
+        // using a Map for O(1) lookup
+        let purchaseMap = new Map()
+        result.forEach(p => {
+            purchaseMap.set(p.courseId.toString(), p.purchasedAt)
         })
+
+        const response = courseData.map(course =>({
+            course,
+            purchasedAt: purchaseMap.get(course._id.toString()) || null
+        }))
+        res.json({
+            courses: response
+        })
+
     }catch(err){
         console.log(err)
         res.status(500).json({

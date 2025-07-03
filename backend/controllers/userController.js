@@ -1,24 +1,13 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import dotenv from 'dotenv'
-import { z } from 'zod'
 import { UserModel } from '../models/db.js'
+import { signup_body, signin_body } from '../schemas/schema.js'
 
 dotenv.config()
 // JWT Secret
 const SECRET = process.env.JWT_USER_SECRET
 
-// Zod Payload
-const signup_body = z.object({
-    username: z.string().email(),
-    password: z.string().min(4).max(10),
-    name: z.string().min(3).max(10)
-})
-
-const signin_body = z.object({
-    username: z.string().email(),
-    password: z.string().min(4).max(10)
-})
 
 export async function userSignup(req, res, next){
     const {username, password, name} = req.body

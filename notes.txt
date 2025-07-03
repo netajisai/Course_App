@@ -36,9 +36,6 @@ Connects to the database
 Starts the server(app.listen)
 
 
-sai --> 1234
-netaji --> 1235
-
 
 🎓 Admin Course Endpoints
 Method	Endpoint	Purpose
@@ -55,10 +52,13 @@ GET	/api/v1/course/user/:courseId	🔍 Get one published course by ID
 POST	/api/v1/course/user/:courseId/buy	💳 Purchase a course
 GET	/api/v1/purchases	📦 Get all purchased courses by user
 
-📌 Optional Enhancements (Future Ideas)
-Feature	Endpoint Idea	Purpose
-Search/filter courses	/api/v1/course/user?title=js	🔍 Search courses by title or tags
-Toggle course publish status	/api/v1/course/:courseId/publish	📤 Admin can publish/unpublish
+
+📦 OPTIONAL / NICE-TO-HAVE
+Feature	Endpoint	Purpose
+Auth Check	GET /api/v1/user/profile	Get current user info (JWT verified)
+Admin Courses	GET /api/v1/admin/courses	Alternative to /course/admin
+Search	GET /api/v1/course/search?q=	Search courses by title/description
+
 
 
 improvements:

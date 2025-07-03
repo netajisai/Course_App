@@ -26,6 +26,7 @@ router.delete('/:courseId', adminAuth, deleteCourse)
 
 // User Course Routes
 router.get('/user/purchases', userAuth, userPurchases)
+
 router.post('/user/:courseId/purchase', userAuth, purchaseCourse)
 
 
