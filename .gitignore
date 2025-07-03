@@ -6,6 +6,7 @@ node_modules/
 
 # notes
 notes.txt
+
 # Logs
 logs/
 *.log
