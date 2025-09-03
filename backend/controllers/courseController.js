@@ -57,6 +57,12 @@ export async function updateCourse(req, res, next){
     
     const {title, description, price, imageLink} = req.body
     const courseId = req.params.courseId
+    console.log(typeof(courseId))
+    if(!mongoose.Types.ObjectId.isValid(courseId)){
+        return res.status(400).json({
+            message: "Invalid Course ID format"
+        })
+    }
     const adminId = req.tokenId
     console.log(adminId)
     try{
@@ -175,9 +181,10 @@ export async function getSpecificCourse(req, res, next){
 
 export async function getCourses(req, res, next){
     try{
+        // CourseModel.find().sort({ createdAt: -1 }).limit(10)
         const courses = await CourseModel.find({}).lean()
         if(courses.length === 0){
-            return res.status.json({
+            return res.status(404).json({
                 message:`No courses found`
             })
         }
@@ -186,7 +193,7 @@ export async function getCourses(req, res, next){
         })
     }catch(err){
         console.log(err)
-        res.status.json({
+        res.status(500).json({
             message: `Error fetching courses:${err}`
         })
     }

@@ -9,7 +9,7 @@ const AdminSchema = new Schema({
 }, {timestamps:true})
 
 const UserSchema = new Schema({
-    username: {type: String, required: true},
+    username: {type: String, unique: true, required: true},
     password: {type: String, required: true},
     name: {type: String, required: true}
 }, {timestamps:true})
@@ -17,13 +17,15 @@ const UserSchema = new Schema({
 const CourseSchema = new Schema({
     title: {type: String, required: true},
     description: {type: String, required: true},
-    price: {type: Number, required: true},
+    price: {type: Number, required: true, min: 0},
     imageLink: {type: String, required: true},
     createdBy: {
         type: Schema.Types.ObjectId,
         ref: 'admins',
+        required: true
     }
 }, { timestamps: true})
+// CourseSchema.index({ createdBy: 1 })
 
 const PurchaseSchema = new Schema({
     userId: {
@@ -41,7 +43,7 @@ const PurchaseSchema = new Schema({
         default: Date.now
     }
 })
-
+// PurchaseSchema.index({ user: 1, course: 1 }, { unique: true })
 
 const AdminModel = mongoose.model('admins', AdminSchema)
 const UserModel = mongoose.model('users', UserSchema)

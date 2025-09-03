@@ -70,6 +70,8 @@ export async function adminSignin(req, res, next){
             error: parsedData.error
         })
     }
+    
+    // const { username, password, name } = parsedData.data
 
     try{
         const admin = await AdminModel.findOne({
@@ -83,13 +85,23 @@ export async function adminSignin(req, res, next){
         const pwd = await bcrypt.compare(password, admin.password)
         console.log(pwd)
         if(!pwd){
-            return res.status(404).json({
+            return res.status(401).json({
                 message: "Invlaid Password"
             })
         }
         const token = jwt.sign({
             id:admin._id.toString()
         }, SECRET)
+
+        // const token = jwt.sign({
+        //         id:admin._id.toString(),
+        //         username: admin.username,
+        //         role: 'admin'
+        //     },
+        //     SECRET,
+        //     {expiresIn: '1h'}
+        // )
+
         console.log(token)
         res.json({
             message: `Admin ${username} logged in`,
