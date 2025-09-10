@@ -114,3 +114,16 @@ export async function adminSignin(req, res, next){
         })
     }
 }
+
+
+export async function admin(req, res, next){
+    res.send("Hello, Express!");
+}
+
+export async function adminSignup1(req, res, next){
+    res.send("Hello, Signup!");
+}
+
+export async function adminSignin1(req, res, next){
+    res.send("Hello, signin!");
+}
