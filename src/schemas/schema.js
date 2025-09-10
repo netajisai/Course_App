@@ -1,16 +1,29 @@
 import {z} from 'zod'
 
-// Schema for signing up for admin&user
-export const signup_body = z.object({
-    username: z.string().email(),
-    password: z.string().min(4, "password must be atleast 4 chars").max(10),
-    name: z.string().min(3, "name must be atleast 3 chars").max(10)
+// Admin&User Signup Schema
+export const signup_schema = z.object({
+    username: z
+      .string()
+      .email("Username must be a valid email"), // ✅ email for login
+    password: z
+      .string()
+      .min(4, "password must be atleast 4 chars")
+      .max(10, "Password cannot exceed 100 characters"),
+    name: z
+      .string()
+      .min(3, "name must be atleast 3 chars")
+      .max(50, "Name cannot exceed 50 characters")
 })
 
-// Scheam for signing in for admin&user
-export const signin_body = z.object({
-    username: z.string().email(),
-    password: z.string().min(4).max(10)
+// Admin&User Signin Scheam
+export const signin_schema = z.object({
+    username: z
+      .string()
+      .email("Username must be a valid email"), // ✅ email for login
+    password: z
+      .string()
+      .min(4, "password must be atleast 4 chars")
+      .max(10, "Password cannot exceed 10 characters"),
 })
 
 // Schema for creating a course

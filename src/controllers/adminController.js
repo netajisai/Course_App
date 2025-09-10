@@ -2,49 +2,44 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import dotenv from 'dotenv'
 import { AdminModel } from '../models/db.js'
-import { signup_body, signin_body } from '../schemas/schema.js'
+import { signup_schema, signin_schema } from '../schemas/schema.js'
 
 dotenv.config()
 // JWT Secret
 const SECRET = process.env.JWT_ADMIN_SECRET
 
 export async function adminSignup(req, res, next){
-    const {username, password, name} = req.body
-    console.log(req.body)
-
-    const parsedData = signup_body.safeParse(req.body)
-    console.log(parsedData)
+    // validate request with zod
+    const parsedData = signup_schema.safeParse(req.body)
     if(!parsedData.success){
         return res.status(400).json({
             message: "Incorrect payload",
             error: parsedData.error
         })
     }
-
+    const {username, password, name} = parsedData.data // ✅ use parsed data
     try{
-        const existing = await AdminModel.findOne({
-            username: username
-        })
-        console.log(existing)
-        if(existing){
+        // Check if user already exists
+        const existing_user = await AdminModel.findOne({ username })
+        if(existing_user){
             return res.status(409).json({
                 message: `Admin user:${username} already signed up`
             })
         }
-        const hashedPassword = await bcrypt.hash(password, 5)
-        console.log(hashedPassword)
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10)
+        // create a new admin
         const admin = await AdminModel.create({
-            username: username,
+            username,
             password: hashedPassword,
-            name: name
+            name
         })
-
-        console.log(admin)
-        res.json({
-            message:`Admin ${name} Signed up`
+        res.status(201).json({
+            message: `Admin ${name} signed up successfully.`,
+            adminId: admin._id
         })
     }catch(err){
-        console.log(err)
+        console.log(`Error during signup:${err}`)
         // Duplicate key error from Mongo DB
         if(err.code == 11000){
             return res.status(409).json({
@@ -53,77 +48,52 @@ export async function adminSignup(req, res, next){
         }
         // Generic Error
         res.status(500).json({
-            message: `Error Signing up:${err}`
+            message: `Error during signup:${err}`
         })
     }
 }
 
 export async function adminSignin(req, res, next){
-    const {username, password} = req.body
-    console.log(req.body)
-    
-    const parsedData = signin_body.safeParse(req.body)
-    console.log(parsedData)
+    // validate payload
+    const parsedData = signin_schema.safeParse(req.body)
     if(!parsedData.success){
         return res.status(400).json({
-            message: "incorrect payload",
+            message: "Incorrect payload",
             error: parsedData.error
         })
     }
-    
-    // const { username, password, name } = parsedData.data
-
+    const {username, password}=parsedData.data
     try{
-        const admin = await AdminModel.findOne({
-            username: username
-        })
+        // check if admin exists
+        const admin = await AdminModel.findOne({ username })
         if(!admin){
-            return res.status(404).json({
+            return res.status(401).json({
                 message: "Invalid username"
             })
         }
-        const pwd = await bcrypt.compare(password, admin.password)
-        console.log(pwd)
-        if(!pwd){
+        const pwdMatch = await bcrypt.compare(password, admin.password)
+        if(!pwdMatch){
             return res.status(401).json({
-                message: "Invlaid Password"
+                message: "Invalid password"
             })
         }
+        // Generate JWT
         const token = jwt.sign({
             id:admin._id.toString()
         }, SECRET)
-
-        // const token = jwt.sign({
-        //         id:admin._id.toString(),
-        //         username: admin.username,
-        //         role: 'admin'
-        //     },
+        // const token = jwt.sign(
+        //     { id: admin._id.toString(), role: "admin" }, // ✅ add role for RBAC
         //     SECRET,
-        //     {expiresIn: '1h'}
-        // )
-
-        console.log(token)
+        //     { expiresIn: "1h" } // ✅ token expiry
+        // );
         res.json({
-            message: `Admin ${username} logged in`,
+           message: `Admin ${username} logged in successfully`,
             token
         })
-
     }catch(err){
+        console.log(`Error during signin: ${err}`)
         res.status(500).json({
-            message: `Error during signin:${err}`
+            message: `Error during signup:${err}`
         })
     }
-}
-
-
-export async function admin(req, res, next){
-    res.send("Hello, Express!");
-}
-
-export async function adminSignup1(req, res, next){
-    res.send("Hello, Signup!");
-}
-
-export async function adminSignin1(req, res, next){
-    res.send("Hello, signin!");
 }
