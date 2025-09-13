@@ -1,94 +1,165 @@
 import mongoose from 'mongoose'
 import { CourseModel, PurchaseModel } from '../models/db.js'
 import { course_schema, partial_course_schema } from '../schemas/schema.js'
+import { safeParse } from 'zod/v4-mini'
 
 
-export async function createCourse(req, res, next){ 
-    const parsed = course_schema.safeParse(req.body)
-    if(!parsed.success){
-        return res.status(400).json({
-            message: "Invalid Course data",
-            error: parsed.error
+
+export async function getAdminCourses(req, res, next){
+    const adminId = req.tokenId
+    try{
+        // const courses = await CourseModel.find({ createdBy: adminId })
+        // .populate("createdBy", "username name -_id") // ✅ include only username & name
+        // .lean()
+        // {
+        //     "courses": [
+        //         {
+        //         "_id": "64fabcd1234def56789abc01",
+        //         "title": "Node.js Mastery",
+        //         "description": "Learn backend development",
+        //         "price": 199,
+        //         "imageLink": "https://example.com/course.png",
+        //         "createdBy": {
+        //             "username": "admin@example.com",
+        //             "name": "John Admin"
+        //         },
+        //         "createdAt": "2025-09-10T10:20:30.000Z",
+        //         "updatedAt": "2025-09-10T10:20:30.000Z"
+        //         }
+        //     ]
+        // }
+        const courses = await CourseModel.find({ createdBy: adminId }).lean()
+        if (courses.length==0){
+            return res.status(404).json({
+                message: `Admin ${adminId} hasn't created any course`
+            })
+        }
+        res.status(200).json({
+            courses
+        })
+    }catch(err){
+        console.log(`Error on fetching courses for admin: ${adminId}`)
+        return res.status(500).json({
+            message: `Error on fetching courses for admin: ${adminId}`
         })
     }
-    
-    const {title, description, price, imageLink}=req.body
-    const adminId = req.tokenId
+}
 
+export async function getSpecificCourse(req, res, next){
+    const adminId = req.tokenId
+    const courseId = req.params.courseId
+    // validate ObjectId
+    if(!mongoose.Types.ObjectId.isValid(courseId)){
+        return res.status(400).json({
+            message: "Invalid course ID format"
+        })
+    }
     try{
+        // const course = await CourseModel.findOne({ _id: courseId, createdBy: adminId })
+        // .populate("createdBy", "username name -_id")
+        // .lean()
+        const course = await CourseModel.findOne({_id:courseId, createdBy:adminId}).lean()
+        if(!course){
+            return res.status(404).json({
+                message: `Course ${courseId} not found or not owned by you`
+            })
+        }
+        res.status(200).json({
+            message: "Course fetched successfully",
+            course
+        })
+    }catch(err){
+        console.error(`Error fetching course for courseID: ${courseId}`, err)
+        res.status(500).json({
+            message: `Error fetching course for courseID: ${courseId}`, err
+        })
+    }
+}
+
+export async function createCourse(req, res, next){
+    // validate request payload with zod
+    console.log(req.body)
+    const parsedData = course_schema.safeParse(req.body)
+    if(!parsedData.success){
+        return res.status(400).json({
+            message: "Incorrect payload",
+            error: parsedData.error
+        })
+    }
+    const { title, description, price, imageLink } = parsedData.data
+    const adminId = req.tokenId
+    try{
+        // check if course already exists
         const exists = await CourseModel.findOne({
             title,
             createdBy: adminId
         })
         if(exists){
             return res.status(409).json({
-                message: `Admin has created course ${title} already`
+                message: `Admin has already created course ${title}`
             })
         }
-        const adminCreate = await CourseModel.create({
-            title,
-            description,
-            price,
-            imageLink,
-            createdBy: adminId
+        // later add a compound index { title: 1, createdBy: 1, unique: true } at the DB level 
+        // for stronger enforcement.
+        const course = await CourseModel.create({
+            title, description, price, imageLink, createdBy: req.tokenId
         })
-        console.log(adminCreate)
         res.status(201).json({
-            message: `Admin created Course ${title} successfully`
+            message:`Course Created: ${title}`,
+            course_id: course._id
         })
     }catch(err){
-        console.log(err)
+        console.log(`Error during creating course:${err}`)
         res.status(500).json({
-            message:`Error Creating Course:${err}`
+            message: `Error during creating course:${err}`
         })
     }
-
 }
 
+
 export async function updateCourse(req, res, next){
-    console.log(req.body)
-    const parsed = partial_course_schema.safeParse(req.body)
-    if(!parsed.success){
+    const parsedData = partial_course_schema.safeParse(req.body)
+    if(!parsedData.success){
         return res.status(400).json({
-            message: "Invalid Course data",
-            error: parsed.error
-        })
-    }
-    
-    const {title, description, price, imageLink} = req.body
-    const courseId = req.params.courseId
-    console.log(typeof(courseId))
-    if(!mongoose.Types.ObjectId.isValid(courseId)){
-        return res.status(400).json({
-            message: "Invalid Course ID format"
+            message: "Invalid course payload",
+            error: parsedData.error
         })
     }
     const adminId = req.tokenId
-    console.log(adminId)
-    try{
-        const updateCourse = await CourseModel.updateOne({
-            _id: courseId,
-            createdBy: adminId
-        }, {
-            title,
-            description,
-            price,
-            imageLink
+    const courseId = req.params.courseId
+    const { title, description, price, imageLink } = parsedData.data
+    if(!mongoose.Types.ObjectId.isValid(courseId)){
+        return res.status(400).json({
+            message: "Invalid courseId format"
         })
+    }
+    try{
+        // create a new payload with only provided values 
+        const updatePayload = {}
+        if (title!==undefined) updatePayload.title=title
+        if (description !== undefined) updatePayload.description = description
+        if (price !== undefined) updatePayload.price = price
+        if (imageLink !== undefined) updatePayload.imageLink = imageLink
+        // checks if course exists or not and then update if found
+        const updateCourse = await CourseModel.findOneAndUpdate(
+            { _id: courseId, createdBy: adminId },
+            { $set: updatePayload },
+            { new: true }
+        ).lean()
         console.log(updateCourse)
-        if(updateCourse.matchedCount === 0){
+        if(!updateCourse){
             return res.status(404).json({
-                message: `Course ${title} not found to update`
+                message: `Course ${courseId} not found or not owned by you.`
             })
         }
         res.json({
-            message: `Course ${title} Updated Successfully`,
-            courseId: updateCourse._id
+            message: `Course ${courseId} Updated Successfully`,
+            course: updateCourse
         })
     }catch(err){
-        console.log(err)
+        console.error(`Error modifying course for courseID: ${courseId}`, err)
         res.status(500).json({
-            message:`Error Updating Course:${err}`
+            message: `Error modifying course for courseID: ${courseId}`, err
         })
     }
 }
@@ -97,150 +168,52 @@ export async function updateCourse(req, res, next){
 export async function deleteCourse(req, res, next){
     const adminId = req.tokenId
     const courseId = req.params.courseId
-    console.log(typeof(courseId))
     if(!mongoose.Types.ObjectId.isValid(courseId)){
         return res.status(400).json({
-            message: "Invalid Course ID format"
+            message: "Invalid courseId format"
         })
     }
     try{
-        const result = await CourseModel.deleteOne({
+        const deleteCourse = await CourseModel.findOneAndDelete({
             _id: courseId,
             createdBy: adminId
         })
-        console.log(result)
-        if(result.deletedCount === 0){
-            return res.status(404).json({
-                message: `course not found to delete`
-            })
-        }
-        res.json({
-            message: `Course ${courseId} deleted successfully`
-        })
-    }catch(err){
-        console.log(err)
-        res.status(500).json({
-            message: `Error deleting course: ${err}`
-        })
-    }
-}
-
-
-export async function getCourse(req, res, next){
-    const adminId = req.tokenId
-    try{
-        const courses = await CourseModel.find({createdBy: adminId}).lean()
-        console.log(courses)
-        if(courses.length === 0){
-            return res.status(404).json({
-                message:`Admin ${adminId} hasn't created any course`
-            })
-        }
-        res.json({
-            courses
-        })
-    }catch(err){
-        console.log(err)
-        res.status(500).json({
-            message: `Error on fetching course:${err}`
-        })
-    }
-}
-
-
-export async function getSpecificCourse(req, res, next){
-    const adminId = req.tokenId
-    const courseId = req.params.courseId
-    if(!mongoose.Types.ObjectId.isValid(courseId)){
-        return res.status(400).json({
-            message:"Invalid courseId format"
-        })
-    }
-
-    try{
-        const course = await CourseModel.findOne({
-            _id: courseId,
-            createdBy: adminId
-        }).lean()
-        if(!course){
+        console.log(deleteCourse)
+        if(!deleteCourse){
             return res.status(404).json({
                 message: `Course ${courseId} not found or not owned by you`
             })
         }
-        res.json({
-            course
+        return res.status(200).json({
+            message: `Course ${courseId} deleted successfully`
         })
     }catch(err){
-        console.log(err)
-        res.status(500).json({
-            message: `Error fetching course:${err}`
+        console.log(`Error deleting course ${courseId}`)
+        res.json({
+            message: `Error deleting course ${courseId}`
         })
     }
 }
+
 
 
 export async function getCourses(req, res, next){
     try{
-        // CourseModel.find().sort({ createdAt: -1 }).limit(10)
-        const courses = await CourseModel.find({}).lean()
-        if(courses.length === 0){
+        // const courses = await CourseModel.find({}).lean()
+        const courses = await CourseModel.find({}).sort({ createdAt:-1 }).limit(10).lean()
+        if(courses.length==0){
             return res.status(404).json({
-                message:`No courses found`
+                message: "No Courses found"
             })
         }
-        res.json({
+        res.status(200).json({
             courses
         })
-    }catch(err){
-        console.log(err)
-        res.status(500).json({
-            message: `Error fetching courses:${err}`
-        })
-    }
-}
-
-
-export async function purchaseCourse(req, res, next){
-    const userId = req.tokenId
-    console.log(userId)
-    const courseId = req.params.courseId
-    if(!mongoose.Types.ObjectId.isValid(courseId)){
-        return res.status(400).json({
-            message: `Invalid courseId ${courseId} format`
-        })
-    }
-
-    try{
-        // if you are just reading documents from mongo use lean() method
-        const course = await CourseModel.findOne({_id: courseId}).lean()
-        console.log(course)
-        if(!course){
-            return res.status(404).json({
-                message: `Course ${courseId} not found to purchase`
-            })
-        }
-        // checking is user already bought the course
-        const exists = await PurchaseModel.findOne({userId, courseId}).lean()
-        if(exists){
-            return res.status(409).json({
-                message:`User ${userId} has already bought this course ${courseId}`
-            })
-        }
-        const result = await PurchaseModel.create({
-            userId, courseId
-        })
-        console.log(result)
-        
-        res.status(201).json({
-            message: `Course ${courseId} purchased successfully`,
-            result,
-            courseInfo:course
-        })
 
     }catch(err){
-        console.log(err)
+        console.log(`Error Fetching courses: ${err}`)
         res.status(500).json({
-            message: `Error purchasing course:${err}`
+            message: `Error fetching courses: ${err}`
         })
     }
 }
@@ -249,37 +222,76 @@ export async function purchaseCourse(req, res, next){
 export async function userPurchases(req, res, next){
     const userId = req.tokenId
     try{
-        const result = await PurchaseModel.find({userId}).lean()
-        if(result.length === 0){
-            return res.status(404).json({
-                message: `User ${userId} not purchased any courses`
+        const userCourses = await PurchaseModel.find({ userId }).lean()
+        if(userCourses.length==0){
+            return res.json({
+                message: `User ${userId} hasn't purchased any courses`
             })
         }
-
-        // Mapping result documents to find course details bought by user
+        // Mapping userCourses documents to find course information bought by user
         const courseData = await CourseModel.find({
-            _id: {$in: result.map(x => x.courseId)}
+            _id: {$in: userCourses.map(x => x.courseId)}
         }).lean()
-
         // find() inside map() will take O(n*m)
         // using a Map for O(1) lookup
         let purchaseMap = new Map()
-        result.forEach(p => {
+        userCourses.forEach(p=>{
             purchaseMap.set(p.courseId.toString(), p.purchasedAt)
         })
-
-        const response = courseData.map(course =>({
+        console.log(purchaseMap)
+        const response = courseData.map(course => ({
             course,
             purchasedAt: purchaseMap.get(course._id.toString()) || null
         }))
-        res.json({
-            courses: response
+        res.status(200).json({
+            message: `User ${userId} has purchased ${userCourses.length} courses`,
+            response
+        })
+    }catch(err){
+        console.log(`Error fetching purchased courses for user:${user}`)
+        res.status(500).json({
+            message: `Error fetching purchased courses for user: ${user}`
+        })
+    }
+}
+
+
+export async function purchaseCourse(req, res, next){
+    const userId = req.tokenId
+    const courseId = req.params.courseId
+    if(!mongoose.Types.ObjectId.isValid(courseId)){
+        return res.status(400).json({
+            message: `Invalid courseId ${courseId}`
+        })
+    }
+
+    try{
+        const course = await CourseModel.findOne({_id:courseId}).lean()
+        console.log(course)
+        if(!course){
+            return res.status(500).json({
+                message: `Course ${courseId} doesn't exist to purchase`
+            })
+        }
+        const exists = await PurchaseModel.findOne({userId, courseId}).lean()
+        if(exists){
+            return res.status(409).json({
+                message: `User ${userId} has already bought this course ${courseId}`
+            })
+        }
+        const purchaseCourse = await PurchaseModel.create({
+            userId, courseId
+        })
+
+        res.send({
+            message: `User ${userId} purchased course ${courseId} successfully`,
+            purchaseCourse
         })
 
     }catch(err){
-        console.log(err)
+        console.log(`Error Purchasing course for user ${userId}: ${err}`)
         res.status(500).json({
-            message: `Error on fetching user purchased courses:${err}`
+            message: `Error Purchasing course for user ${userId}: ${err}`
         })
     }
 }

@@ -28,9 +28,15 @@ export const signin_schema = z.object({
 
 // Schema for creating a course
 export const course_schema = z.object({
-    title: z.string().min(3, "Title must be at least 3 characters"),
-    description: z.string().min(10, "Description must be at least 10 characters"),
-    price: z.number().positive("Price must be a positive number"),
+    title: z
+      .string()
+      .min(3, "Title must be at least 3 characters"),
+    description: z
+      .string()
+      .min(10, "Description must be at least 10 characters"),
+    price: z
+      .number()
+      .positive("Price must be a positive number"),
     imageLink: z.string()
 })
 

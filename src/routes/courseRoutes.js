@@ -1,6 +1,6 @@
 import express from 'express'
 import {
-    getCourse, getSpecificCourse, 
+    getAdminCourses, getSpecificCourse, 
     createCourse, updateCourse, deleteCourse, 
     getCourses, purchaseCourse, userPurchases
 } from '../controllers/courseController.js'
@@ -13,7 +13,7 @@ const router = express.Router()
 router.get('/published', getCourses)
 
 // Admin Course Routes
-router.get('/admin', adminAuth, getCourse)
+router.get('/admin', adminAuth, getAdminCourses)
 
 router.get('/:courseId', adminAuth, getSpecificCourse)
 

@@ -25,7 +25,9 @@ const CourseSchema = new Schema({
         required: true
     }
 }, { timestamps: true})
-// CourseSchema.index({ createdBy: 1 })
+// Add an index for sorting by createdAt
+CourseSchema.index({ createdAt: -1 })
+
 
 const PurchaseSchema = new Schema({
     userId: {

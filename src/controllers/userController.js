@@ -71,7 +71,7 @@ export async function userSignin(req, res, next){
                 message: "Invalid username"
             })
         }
-        const pwdMatch = await bcrypt.compare(password, admin.password)
+        const pwdMatch = await bcrypt.compare(password, user.password)
         if(!pwdMatch){
             return res.status(401).json({
                 message: "Invalid password"
