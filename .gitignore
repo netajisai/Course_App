@@ -9,6 +9,7 @@ endpoints.txt
 mongo.txt
 structure.txt
 node.txt
+graphQL.txt
 
 # Logs
 logs/
